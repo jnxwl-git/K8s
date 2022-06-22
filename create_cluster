@@ -1,0 +1,63 @@
+https://developpaper.com/vagrant-multi-node-virtual-machine-cluster-construction/
+
+
+1. vagrant box add ubuntu/xenial64 or  vagrant box add /your/path/virtualbox.box --name VM1
+
+
+2. vagrant box list покажет:
+
+VM1   (virtualbox, 0)
+
+
+3.
+- mkdir vagrant_test
+- cd vagrant_test
+- vagrant init ubuntu/xenial64
+
+4. vagrant up
+
+5.
+- mkdir vagrant_cluster
+- cd vagrant_cluster
+- vagrant init ubuntu/xenial64
+
+5. Заменить в файлк Vagrantfile
+
+Vagrant.configure("2") do |config|
+   (1..4).each do |i|
+
+      #Название ноды
+      config.vm.define "node#{i}" do |node|
+
+      #Конфа
+      node.vm.box = "ubuntu"
+      config.ssh.forward_agent = true
+      check_guest_additions = false
+      functional_vboxsf = false
+      #название вм
+      node.vm.hostname = "node#{i}"
+
+      #частная сетка
+      node.vm.network "private_network", ip: "192.168.10.#{10+i}"
+
+
+      node.vm.provider "virtualbox" do |v|
+
+
+          v.name = "node#{i}"
+
+
+          v.memory = 2048
+
+      
+          v.cpus = 2
+      end
+  end
+end
+end
+
+
+
+6. vagrant up
+
+7. vagrant up node1 node2

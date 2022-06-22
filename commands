@@ -1,0 +1,90 @@
+//Псевдоним
+Set-Alias -Name k -Value kubectl
+Set-Alias -Name mk -Value minikube
+
+//Старт кубов
+minikube.exe start --no-vtx-check
+
+ --alsologtostderr (лог в ~/.minikube)
+
+minikube.exe start --cpus=4 --memory=8gb/8000mb --disk-size=25gb --no-vtx-check
+
+//Стоп кубов (остановка ВМ с сохранением данных)
+minikube.exe stop
+
+//Удалить куб (ISO файлв остаются)
+minikube.exe delete
+
+// Статус кластера
+kubectl.exe get componentstatuses
+
+kubectl cluster-info
+
+//Инфа по нодам
+kubectl.exe get nodes
+
+//Инфа по подам
+kubectl.exe get pods
+
+//Удалить под
+kubectl.exe delete pods <название подса>
+
+//Подробная информация о поде
+kubectl.exe describe pods <название подса>
+
+//Посмотреть дату на поде
+kubectl.exe exec apache -- date
+
+//Запуск cli на поде
+kubectl.exe exec -it apache -- sh
+
+//Просмотр лог PODs
+kubectl.exe logs <название подса>
+
+//Перенаправление портов
+kubectl.exe port-forward <название подса> 1234:80
+
+
+//ssh
+minikube ssh (user=root)
+
+// Create pod (old before v1.18)
+kubectl.exe run hello --generator=run-pod/v1 --image=jnxwl/apache:latest --port=80
+
+// Create pod (after v1.18)
+kubectl run --image=jnxwl/apache:latest myfirstpod --port=80
+
+// Create pod (YAML)
+kubectl apply -f <file.yaml>
+
+// Delete pod (YAML)
+kubectl delete -f <file.yaml>
+
+//Add nodes to cluster
+kubeadm join --token <token> <control-plane-host>:<control-plane-port> --discovery-token-ca-cert-hash sha256:<hash>
+
+//Create cluster
+kubeadm init --pod-network-cidr=192.168.89.0/16
+
+
+
+//config kubelet
+/var/lib/kubelet/config.yaml
+
+
+
+
+
+
+
+
+
+START>
+1. Initializes cluster master node
+kubeadm init --apiserver-advertise-address $(hostname -i) --pod-network-cidr 10.5.0.0/16
+
+2. Initialize cluster networking:
+kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
+
+3. (Optional) Create an nginx deployment:
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/website/master/content/en/examples/application/nginx-app.yaml

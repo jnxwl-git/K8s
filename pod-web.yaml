@@ -1,0 +1,20 @@
+apiVersion : v1
+kind: Pod
+metadata:
+  name: web-2
+  labels:
+    env  : prod
+    app  : main
+    tier : frontend
+    owner : e.kandaurov
+spec:
+  containers:
+    - name: container-apache
+      image: jnxwl/apache:latest
+      ports:
+        - containerPort: 80
+
+    - name: container-tomacat
+      image: tomcat:latest
+      ports:
+        - containerPort: 8080

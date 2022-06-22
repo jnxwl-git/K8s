@@ -1,0 +1,1 @@
+k run echo --image=gcr.io/google_containers/echoserver:1.8 --port=8080

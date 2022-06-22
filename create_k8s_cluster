@@ -1,0 +1,200 @@
+//Vagrantfile
+
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+hosts = {
+ "n1" => "192.168.89.10",
+ "n2" => "192.168.89.11",
+ "n3" => "192.168.89.12",
+ "n4" => "192.168.89.13"
+}
+Vagrant.configure("2") do |config|
+
+ # всегда используем небезопасный ключ Vagrant
+ config.ssh.insert_key = false
+
+ # перенаправляем ssh-агент, чтобы получить легкий доступ к разным узлам
+ config.ssh.forward_agent = true
+ check_guest_additions = false
+ functional_vboxsf = false
+ config.vm.box = "ubuntu"
+
+hosts.each do |name, ip|
+ config.vm.hostname = name
+ config.vm.define name do |machine|
+ machine.vm.network :private_network, ip: ip
+ machine.vm.provider "virtualbox" do |v|
+ v.name = name
+ v.memory = 2048
+ v.cpus = 2
+ end
+ end
+ end
+end
+
+
+//Node N4
+sudo apt-get -y --fix-missing install pip sshpass
+sudo pip install ansible
+
+//Create hosts.txt file
+[all]
+192.168.89.10 ansible_user=vagrant ansible_ssh_pass=vagrant
+192.168.89.11 ansible_user=vagrant ansible_ssh_pass=vagrant
+192.168.89.12 ansible_user=vagrant ansible_ssh_pass=vagrant
+
+//Create vars.yml file
+---
+PACKAGES:
+ - htop
+ - docker.io
+ - kubelet
+ - kubeadm
+ - kubectl
+ - kubernetes-cni
+
+//Create  install-k8s.yml file
+
+---
+- hosts: all
+  become: true
+  vars_files:
+    - vars.yml
+  strategy: free
+  tasks:
+    - name: hack to resolve Problem with MergeList Issue
+      shell: 'find /var/lib/apt/lists -maxdepth 1 -type f -exec rm -v {} \;'
+    - name: update apt cache directly (apt module not reliable)
+      shell: 'apt-get clean && apt-get update'
+    - name: Preliminary installation
+      apt: name=apt-transport-https force=yes
+    - name: Add the Google signing key
+      apt_key: url=https://packages.cloud.google.com/apt/doc/apt-key.gpg state=present
+    - name: Add the k8s APT repo
+      apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+        state: present
+    - name: update apt cache directly (apt module not reliable)
+      shell: 'apt-get update'
+    - name: Install packages
+      apt: name={{ item }} state=latest force=yes
+      with_items: "{{ PACKAGES }}"
+
+
+//Create .ansible.cfg
+[defaults]
+host_key_checking = False
+
+//disable swap
+---
+- hosts: all
+  become: true
+  strategy: free
+
+  tasks:
+    - name: Add the longsleep repo for recent golang version
+      apt_repository:
+        repo: ppa:longsleep/golang-backports
+        state: present
+
+    - name: update apt cache directly
+      shell: 'apt-get update'
+      args:
+        warn: False
+
+    - name: Install Go
+      apt: name=golang-go state=present force=yes
+
+    - name: ifconf
+      apt: name=net-tools state=latest
+
+    - name: wget crictl
+      shell: 'wget https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.24.1/crictl-v1.24.1-linux-amd64.tar.gz'
+
+    - name: unzip
+      shell: 'sudo tar zxvf crictl-v1.24.1-linux-amd64.tar.gz -C /usr/local/bin'
+
+    - name: Set hostname properly
+      shell: "hostname n$((1 + $(ifconfig | grep 192.168 | awk '{print $2}' | tail -c 2)))"
+
+    - name: Turn off swap
+      shell: 'swapoff -a'
+
+    - name: Turn off swap
+      shell: 'swapoff -a'
+
+//////////////////////////////////////////////////Alternate
+---
+ - hosts: all
+   become: true
+   strategy: free
+
+   tasks:
+     - name: Add the longsleep repo for recent golang version
+       apt_repository:
+         repo='ppa:longsleep/golang-backports' state=present
+
+     - name: update apt cache directly (apt module not reliable)
+       shell: 'apt-get update'
+       args:
+         warn: False
+
+     - name: Install Go
+       apt: name=golang-go state=present force=yes
+       become_user: vagrant
+
+     - name: ifconf
+       apt: name=net-tools state=latest
+
+     - name: wget crictl
+       shell: 'wget https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.24.1/crictl-v1.24.1-linux-amd64.tar.gz'
+
+     - name: unzip
+       shell: 'sudo tar zxvf crictl-v1.24.1-linux-amd64.tar.gz -C /usr/local/bin'
+
+     - name: Set hostname properly
+       shell: "hostname n$((1 + $(ifconfig | grep 192.168 | awk '{print $2}' | tail -c 2)))"
+
+     - name: Turn off swap
+       shell: 'swapoff -a'
+
+
+
+//Create master node
+sudo kubeadm init --apiserver-advertise-address 192.168.10.10
+or
+sudo kubeadm init --pod-network-cidr=192.168.10.0/16 --apiserver-advertise-address=192.168.10.10
+
+//ERROR START KUBELET
+sudo swapoff -a
+
+sudo systemctl restart kubelet.service
+
+systemctl status kubelet
+
+
+//delete
+sudo rm /etc/kubernetes/manifests/kube-apiserver.yaml && sudo rm /etc/kubernetes/manifests/kube-controller-manager.yaml && sudo rm /etc/kubernetes/manifests/kube-scheduler.yaml && sudo rm /etc/kubernetes/manifests/etcd.yaml
+
+
+
+//attach workers
+sudo kubeadm join 192.168.10.10:6443 --token fj31g0.8yvergcanxxrubtf \
+        --discovery-token-ca-cert-hash sha256:897d16689e33ce42b9f0c8025789646b6427261303339cd87608c5f27fe25a19 --ignore-preflight-errors=all
+
+|||clean
+sudo kubeadm join --token "token" --discovery-token-ca-cert-hash
+"discovery token" --ignore-preflight-errors=all
+
+
+
+//next
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+
+
+//monitoring
+git clone https://github.com/kubernetes/heapster.git
